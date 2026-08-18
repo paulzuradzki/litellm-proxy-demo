@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+.ipynb_checkpoints/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+
+# Docker runtime
+/tmp/
+
+# Local tooling
+.pi-subagents/
+
+# macOS
+.DS_Store

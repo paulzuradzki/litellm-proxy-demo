@@ -1,0 +1,23 @@
+[project]
+name = "litellm-proxy-demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "litellm>=1.96.2",
+    "python-dotenv>=1.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.6.3",
+]
+
+# Dependency cooldown: resolution only considers releases uploaded at
+# least 7 days ago, so a bad PyPI release has to sit in public for a
+# week before it can be picked up. Re-run `uv lock --upgrade`
+# occasionally (e.g. weekly) to pick up new versions within the window.
+[tool.uv]
+exclude-newer = "7 days"

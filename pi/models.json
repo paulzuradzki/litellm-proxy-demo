@@ -1,0 +1,20 @@
+{
+  "providers": {
+    "litellm": {
+      "baseUrl": "https://ai.paulzuradzki.com/v1",
+      "api": "openai-completions",
+      "apiKey": "$LITELLM_API_KEY",
+      "models": [
+        { "id": "local/qwen3.8-27b-5090", "name": "Qwen 3.8 27B (5090)" },
+        { "id": "local/qwen3.6-moe-5090", "name": "Qwen 3.6 MoE (5090)" },
+        { "id": "local/qwen3.6-moe-think-5090", "name": "Qwen 3.6 MoE Think (5090)" },
+        { "id": "local/qwen3.6-dense-5090", "name": "Qwen 3.6 Dense (5090)" },
+        { "id": "local/qwen3.8-27b-strix", "name": "Qwen 3.8 27B (Strix)" },
+        { "id": "local/nemotron-lightning-5090", "name": "Nemotron Lightning (5090)" },
+        { "id": "local/nemotron-lightning-strix", "name": "Nemotron Lightning (Strix)" },
+        { "id": "local/muse-glimmer-5090", "name": "Muse Glimmer (5090)" },
+        { "id": "local/muse-glimmer-strix", "name": "Muse Glimmer (Strix)" }
+      ]
+    }
+  }
+}

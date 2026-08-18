@@ -1,0 +1,27 @@
+services:
+  pi:
+    build: .
+    entrypoint: ["/bin/sh"]
+    env_file: .env
+    environment:
+      PI_CODING_AGENT_DIR: /root/.pi/agent
+      UV_CACHE_DIR: /tmp/uv-cache
+      UV_PYTHON: /usr/bin/python3
+    volumes:
+      - .:/workspace
+      - pi-agent-home:/root/.pi/agent
+      - ./pi/models.json:/root/.pi/agent/models.json:ro
+    working_dir: /workspace
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    shm_size: 1gb
+    tmpfs:
+      - /tmp
+    stdin_open: true
+    tty: true
+
+volumes:
+  pi-agent-home:
