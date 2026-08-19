@@ -1,7 +1,10 @@
+# All demos and the agent run in this one sandboxed container with the repo
+# mounted at /workspace. --rm (in the justfile) deletes it on exit, and compose
+# builds the image automatically if it isn't present yet.
 services:
   pi:
     build: .
-    entrypoint: ["/bin/sh"]
+    entrypoint: ["/bin/sh"]   # just shell drops you here to run pi yourself
     env_file: .env
     environment:
       PI_CODING_AGENT_DIR: /root/.pi/agent
