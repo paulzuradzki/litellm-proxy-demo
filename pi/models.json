@@ -13,7 +13,10 @@
         { "id": "local/nemotron-lightning-5090", "name": "Nemotron Lightning (5090)" },
         { "id": "local/nemotron-lightning-strix", "name": "Nemotron Lightning (Strix)" },
         { "id": "local/muse-glimmer-5090", "name": "Muse Glimmer (5090)" },
-        { "id": "local/muse-glimmer-strix", "name": "Muse Glimmer (Strix)" }
+        { "id": "local/muse-glimmer-strix", "name": "Muse Glimmer (Strix)" },
+        { "id": "local/qwen3.8-flashnext-engram", "name": "Qwen 3.8 Flash-Next (EngramHalo, thinking)" },
+        { "id": "local/qwen3.8-flashnext-engram-notalk", "name": "Qwen 3.8 Flash-Next (EngramHalo)" },
+        { "id": "local/qwen3.8-flashnext-engram-deep", "name": "Qwen 3.8 Flash-Next (EngramHalo, 256K)" }
       ]
     }
   }

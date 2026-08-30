@@ -7,6 +7,8 @@
 
 Use the MoE when you want the extra tokens per second; qwen3.8 takes images and runs at the same speed. The rest of the table exists to get more context, more reasoning, or to use the other card.
 
+The three `-engram` entries are the exception: they run on a different llama.cpp fork and the operator starts that backend by hand, so treat them as available on request rather than always up. See [EngramHalo](#engramhalo) below.
+
 <details>
 <summary>Primer on serving inference with llama.cpp</summary>
 
@@ -52,6 +54,9 @@ A proxy model name is a key in the host's model registry, listed at `<BASE_URL>/
 | `local/qwen3.8-27b-strix` | Qwen 3.8 27B hybrid attn+SSM + MTP + vision | UD-Q4_K_XL (proj. BF16) | Strix | `-c 262144`, `--mmproj`, `--spec-draft-n-max 8`, `--reasoning off` |
 | `local/muse-glimmer-strix` | Meta Muse Glimmer 28B dense + vision + DFlash drafter | kquant-dynamic | Strix | same GGUFs and flags as the 5090 twin |
 | `local/nemotron-lightning-strix` | NVIDIA Nemotron 3.5 Lightning 30B-A3B | Q4_K_M | Strix | `-c 262144`, `--spec-draft-n-max 16`, `--reasoning off` (must stay off: short requests return empty) |
+| `local/qwen3.8-flashnext-engram` | Qwen 3.8 Flash-Next + MTP, on the EngramHalo fork | AD-4.27bpw-Q4_K_M | Strix | `-c 131072`, 8-bit KV cache, `--spec-draft-n-max 4 --spec-draft-p-min 0.75`, thinking capped at 8192 tokens |
+| `local/qwen3.8-flashnext-engram-notalk` | same model and drafter, no thinking block | AD-4.27bpw-Q4_K_M | Strix | as above, `--reasoning off` |
+| `local/qwen3.8-flashnext-engram-deep` | same model, no drafter | AD-4.27bpw-Q4_K_M | Strix | `-c 262144`, no speculative decoding |
 
 **Why the same model runs differently on the two cards.**
 
@@ -59,6 +64,18 @@ A proxy model name is a key in the host's model registry, listed at `<BASE_URL>/
 - **Speculative draft depth** (`--spec-draft-n-max`): 2 or 4 on the 5090, 16 on Strix. A deep draft needs the `--spec-draft-p-min` confidence floor, and the 5090 keeps the draft shallow because the 32 GB card has less room for the extra head's memory.
 - **Quant**: Nemotron runs NVFP4 on the 5090 and Q4_K_M on Strix. NVFP4 is faster on CUDA but decodes slower on the AMD ROCm build, and the 128 GB card has room for the larger Q4_K_M file.
 - **Images**: the `qwen3.8-27b-*` and `muse-glimmer-*` entries accept images on both cards; the others are text only.
+
+## EngramHalo
+
+The `-engram` entries do not run on [llama.cpp](https://github.com/ggml-org/llama.cpp) itself. They run on [EngramHalo.cpp](https://github.com/Aristo94/EngramHalo.cpp), a fork written for the Strix Halo iGPU, on a newer ROCm than the other `-strix` entries use. It carries three things mainline does not have: a custom top-k kernel, a sparse gather that reads roughly 2.3K selected KV rows past 16K context instead of the whole cache, and a working MTP draft head for this model. On coding prompts the default lane generates 28-30 tokens per second, which matches `local/qwen3.8-27b-strix` from a much larger model.
+
+**Engram table.** Flash-Next keeps a large lookup table of per-layer embeddings, ~26.8 GB in this quant, separate from the weights the model multiplies through. The server memory-maps it and reads rows on demand rather than holding it in RAM (`-lm mmap --tensor-read-lazy on`), so the table stays on SSD at about 1 GB resident. The weights still need ~54.5 GB, which is why these entries only exist on the 128 GB card.
+
+**Two of the three lanes differ only in the thinking block.** `-engram` caps its `think` block at 8192 tokens; `-engram-notalk` turns it off. The cap is there because an uncapped `think` block can spend a short request's whole token budget reasoning and return empty content, which sends coding agents into retry loops.
+
+**`-engram-deep` trades the drafter for context.** MTP is measured working to about 163K tokens and the full 262144 window only without it, so the deep lane drops speculative decoding to reach the wider window. That costs 30-39% of generation speed on coding work, so reach for it only when a prompt does not fit in 131072 tokens.
+
+**Why these lanes are not always up.** This fork and the mainline `-strix` entries share one pool of memory with no coordination between them, and Flash-Next alone claims about 54.5 GB of it. The operator starts the backend when it is wanted rather than leaving it resident. A request to an `-engram` model while the backend is down returns an error rather than starting it.
 
 ## Quantization
 
@@ -96,6 +113,7 @@ A multimodal model ships two files: the main weights (above) and a `mmproj` file
 - **MTP (multi-token prediction)**: a built-in drafter. Some Qwen and Nemotron checkpoints are trained with an extra small head that already predicts the next token, so they need no separate drafter file; at inference that head does the guessing in speculative decoding. The cost: the head takes VRAM, a deeper draft (higher `n-max`) takes more of it, and the draft is generated in sequence, one token after another, rather than in parallel. On a 32 GB card that is why the draft stays shallow. You trade memory for a large decode-speed gain on a single request.
 - **DFlash**: Muse Glimmer's drafter. Unlike MTP, it is a separate small model file (its own GGUF) that guesses tokens for the main model to check, loaded with `--spec-draft-model`. Same idea as speculative decoding, with a standalone file instead of a built-in head.
 - **MoE (mixture of experts)**: an architecture that, for each token, activates only a few of many specialist sub-networks instead of all of them. A 35B MoE reads roughly 3B of weights per token, so it generates much faster than a 35B dense model. The whole model still has to sit in memory, so the speed win comes at no extra memory cost.
+- **MTP head vs. a separate drafter**: see MTP and DFlash above. The `-engram` lanes load the MTP head from a second file (`-md`) because the published Flash-Next GGUFs strip the head out of the main weights.
 - **Hybrid attn+SSM**: Qwen 3.8's design. Most layers keep a fixed-size "running summary" of the conversation (the SSM part) instead of a growing list of every past token, and only a quarter of layers use the usual attention that stores a per-token cache. Long contexts cost much less memory, which is what lets it run a 224K window on 32 GB.
 - **Flash attention** (`-fa 1`): a faster way to compute attention that also uses less memory while it runs.
 - **mmap / `--no-mmap`**: by default the OS loads the model file from disk bit by bit as it is needed (memory-mapping). `--no-mmap` reads the whole file into RAM up front, so generation is steady and fast at the cost of a bigger one-time memory hit at load.
